@@ -1,0 +1,4 @@
+librosa>=0.10.2
+numpy>=1.26
+Pillow>=10.0
+yt-dlp>=2025.1.15
