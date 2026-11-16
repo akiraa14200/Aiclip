@@ -26,13 +26,11 @@ def probe_duration(path):
 def beat_times(audio_path):
     try:
         import librosa
-        import numpy as np
         y, sr = librosa.load(str(audio_path), sr=22050, mono=True)
         if len(y) < sr:
             return []
         _, beats = librosa.beat.beat_track(y=y, sr=sr, units="time")
-        times = [float(t) for t in beats if t > 0.15]
-        return times
+        return [float(t) for t in beats if t > 0.15]
     except Exception as exc:
         print(f"Beat analysis unavailable; using even scene timing: {exc}")
         return []
@@ -41,6 +39,7 @@ def main():
     if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
         raise RuntimeError("FFmpeg and ffprobe are required.")
     cfg = json.loads(CONFIG.read_text())
+    INPUT.mkdir(parents=True, exist_ok=True)
     OUTPUT.mkdir(parents=True, exist_ok=True); WORK.mkdir(exist_ok=True)
     for p in OUTPUT.glob("*.mp4"): p.unlink()
     for p in WORK.iterdir():
@@ -49,13 +48,14 @@ def main():
 
     url = os.getenv("INPUT_YOUTUBE_URL", "").strip() or cfg.get("youtube_url", "").strip()
     if url:
-        # yt-dlp only retrieves publicly accessible media; it does not bypass DRM or private access.
+        # Only publicly accessible media; no DRM/private-access bypass.
         download_dir = WORK / "youtube"; download_dir.mkdir(exist_ok=True)
         run(["yt-dlp", "--no-playlist", "-f", "bv*[height<=1080]+ba/b[height<=1080]",
              "--merge-output-format", "mp4", "-o", str(download_dir / "source.%(ext)s"), url])
         downloaded = sorted(download_dir.glob("source.*"))
         if downloaded:
-            shutil.copy2(downloaded[0], INPUT / "youtube-source" + downloaded[0].suffix)
+            target = INPUT / ("youtube-source" + downloaded[0].suffix)
+            shutil.copy2(downloaded[0], target)
 
     tracks = sorted([p for p in AUDIO.iterdir() if p.suffix.lower() in AUDIO_EXT])
     if not tracks:
@@ -73,22 +73,22 @@ def main():
     fps = int(cfg.get("fps", 30))
     audio_len = probe_duration(soundtrack)
     beats = beat_times(soundtrack) if cfg.get("beat_sync", True) else []
-    # Use beat intervals as target scene boundaries, then cap/floor to avoid frantic cuts.
     cuts = [0.0]
     if beats:
-        cuts += [t for t in beats if 0.65 <= t <= audio_len and t - cuts[-1] >= 1.15]
+        for t in beats:
+            if 0.65 <= t < audio_len and t - cuts[-1] >= 1.15:
+                cuts.append(t)
     else:
         step = float(cfg.get("image_seconds", 3.0))
-        cuts += [t for t in [i*step for i in range(1, int(audio_len/step)+1)] if t < audio_len]
+        cuts += [t for t in (i*step for i in range(1, int(audio_len/step)+1)) if t < audio_len]
     cuts.append(audio_len)
+
     segments = []
-    for i, src in enumerate(media):
-        if i >= len(cuts)-1: break
-        start, end = cuts[i], cuts[i+1]
-        duration = max(0.5, end-start)
+    for i in range(len(cuts)-1):
+        src = media[i % len(media)]
+        duration = max(0.5, cuts[i+1]-cuts[i])
         out = WORK / f"segment_{i:04d}.mp4"
         if src.suffix.lower() in IMAGE_EXT:
-            # Gentle alternating Ken Burns movement; image is scaled/cropped to fill the frame.
             zoom_expr = "min(zoom+0.0008,1.12)" if i % 2 == 0 else "if(eq(on,1),1.12,max(zoom-0.0008,1.0))"
             vf = f"scale={w*2}:{h*2}:force_original_aspect_ratio=increase,crop={w*2}:{h*2},zoompan=z='{zoom_expr}':d=1:s={w}x{h}:fps={fps},setsar=1,format=yuv420p"
             run(["ffmpeg","-y","-loop","1","-i",src,"-t",f"{duration:.3f}","-vf",vf,
@@ -98,8 +98,7 @@ def main():
             run(["ffmpeg","-y","-i",src,"-t",f"{duration:.3f}","-vf",vf,"-an",
                  "-c:v","libx264","-preset","veryfast","-crf",crf,"-r",str(fps),str(out)])
         segments.append(out)
-    if not segments:
-        raise RuntimeError("No renderable segments were produced.")
+
     concat = WORK / "concat.txt"
     concat.write_text("".join(f"file '{p.resolve().as_posix()}'\n" for p in segments))
     final = OUTPUT / "aiclip-final.mp4"
