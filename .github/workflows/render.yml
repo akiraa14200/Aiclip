@@ -1,0 +1,66 @@
+name: Aiclip Render
+
+on:
+  workflow_dispatch:
+    inputs:
+      youtube_url:
+        description: "Optional public YouTube URL you have permission to use"
+        required: false
+        type: string
+      aspect_ratio:
+        description: "Output format"
+        required: true
+        type: choice
+        options:
+          - "9:16"
+          - "16:9"
+          - "1:1"
+        default: "9:16"
+      quality:
+        description: "Render quality"
+        required: true
+        type: choice
+        options:
+          - "standard"
+          - "high"
+        default: "standard"
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Render video
+        env:
+          INPUT_YOUTUBE_URL: ${{ inputs.youtube_url }}
+          INPUT_ASPECT_RATIO: ${{ inputs.aspect_ratio }}
+          INPUT_QUALITY: ${{ inputs.quality }}
+        run: python scripts/render.py
+
+      - name: Upload rendered MP4
+        uses: actions/upload-artifact@v4
+        with:
+          name: aiclip-render
+          path: media/output/*.mp4
+          if-no-files-found: error
+          retention-days: 7
