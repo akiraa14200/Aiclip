@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Aiclip's first beat-aware renderer. Uses FFmpeg for all actual rendering."""
 from __future__ import annotations
-import json, os, shutil, subprocess, sys
+import json, os, re, shutil, subprocess, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-INPUT = ROOT / "media/input"
-AUDIO = ROOT / "media/audio"
+PROJECT_ID = os.getenv("INPUT_PROJECT_ID", "").strip()
+INPUT = ROOT / "media/jobs" / PROJECT_ID / "input"
+AUDIO = ROOT / "media/jobs" / PROJECT_ID / "audio"
 OUTPUT = ROOT / "media/output"
 WORK = ROOT / "work"
 CONFIG = ROOT / "config/edit.json"
@@ -36,6 +37,8 @@ def beat_times(audio_path):
         return []
 
 def main():
+    if not re.fullmatch(r"[A-Za-z0-9-]{1,80}", PROJECT_ID):
+        raise RuntimeError("A valid project_id is required. Start renders from the Aiclip webpage.")
     if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
         raise RuntimeError("FFmpeg and ffprobe are required.")
     cfg = json.loads(CONFIG.read_text())
@@ -59,11 +62,11 @@ def main():
 
     tracks = sorted([p for p in AUDIO.iterdir() if p.suffix.lower() in AUDIO_EXT])
     if not tracks:
-        raise RuntimeError("Add one soundtrack to media/audio/ before rendering.")
+        raise RuntimeError("Add a soundtrack to this project before rendering.")
     soundtrack = tracks[0]
     media = sorted([p for p in INPUT.rglob("*") if p.is_file() and p.suffix.lower() in IMAGE_EXT | VIDEO_EXT])
     if not media:
-        raise RuntimeError("Add at least one image/video to media/input/ or provide a permitted YouTube URL.")
+        raise RuntimeError("Add at least one image/video to this project or provide a permitted YouTube URL.")
 
     ratio = os.getenv("INPUT_ASPECT_RATIO", cfg.get("aspect_ratio", "9:16"))
     dims = {"9:16": (1080,1920), "16:9": (1920,1080), "1:1": (1080,1080)}
