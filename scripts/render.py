@@ -43,6 +43,7 @@ def main():
         raise RuntimeError("FFmpeg and ffprobe are required.")
     cfg = json.loads(CONFIG.read_text())
     INPUT.mkdir(parents=True, exist_ok=True)
+    AUDIO.mkdir(parents=True, exist_ok=True)
     OUTPUT.mkdir(parents=True, exist_ok=True); WORK.mkdir(exist_ok=True)
     for p in OUTPUT.glob("*.mp4"): p.unlink()
     for p in WORK.iterdir():
