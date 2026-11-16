@@ -1,0 +1,12 @@
+{
+  "aspect_ratio": "9:16",
+  "width": 1080,
+  "height": 1920,
+  "fps": 30,
+  "image_seconds": 3.0,
+  "transition_seconds": 0.35,
+  "motion": "ken_burns",
+  "beat_sync": true,
+  "video_audio": false,
+  "youtube_url": ""
+}
