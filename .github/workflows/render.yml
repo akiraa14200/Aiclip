@@ -3,6 +3,10 @@ name: Aiclip Render
 on:
   workflow_dispatch:
     inputs:
+      project_id:
+        description: "Unique Aiclip project folder ID"
+        required: true
+        type: string
       youtube_url:
         description: "Optional public YouTube URL you have permission to use"
         required: false
@@ -52,6 +56,7 @@ jobs:
 
       - name: Render video
         env:
+          INPUT_PROJECT_ID: ${{ inputs.project_id }}
           INPUT_YOUTUBE_URL: ${{ inputs.youtube_url }}
           INPUT_ASPECT_RATIO: ${{ inputs.aspect_ratio }}
           INPUT_QUALITY: ${{ inputs.quality }}
