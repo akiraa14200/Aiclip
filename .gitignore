@@ -1,0 +1,15 @@
+media/input/*
+!media/input/.gitkeep
+media/audio/*
+!media/audio/.gitkeep
+media/output/*
+!media/output/.gitkeep
+work/
+*.mp4
+*.wav
+*.mp3
+*.m4a
+*.mov
+*.webm
+__pycache__/
+.venv/
